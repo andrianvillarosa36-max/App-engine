@@ -13,7 +13,6 @@ import {
   Pencil,
   Map as MapIcon,
   LayoutTemplate,
-  Type as TypeIcon,
   Shield,
   Info,
   MessageSquare,
@@ -22,9 +21,9 @@ import {
   X,
   Layers,
   Users,
-  Sparkles,
 } from "lucide-react";
 import TilemapPainter, { makeDefaultTilemap } from "./TilemapPainter.jsx";
+import MenuPainter, { makeDefaultMenu } from "./MenuPainter.jsx";
 
 // ---------------------------------------------------------------------------
 // Token system
@@ -929,13 +928,16 @@ function Toggle({ on, onChange, c }) {
   );
 }
 
-const MENU_TOOLS = [
-  { label: "Buttons", icon: LayoutTemplate },
-  { label: "Text", icon: TypeIcon },
-  { label: "Backgrounds", icon: Layers },
-  { label: "Transitions", icon: Sparkles },
-];
-function EditorScreen({ c, fs, project, onBack, tilemapData, onTilemapChange }) {
+function EditorScreen({
+  c,
+  fs,
+  project,
+  onBack,
+  tilemapData,
+  onTilemapChange,
+  menuData,
+  onMenuChange,
+}) {
   const showBoth = project.type === "combined";
   const [tab, setTab] = useState(
     project.type === "gameplay" ? "gameplay" : "menu"
@@ -973,86 +975,7 @@ function EditorScreen({ c, fs, project, onBack, tilemapData, onTilemapChange }) 
       {tab === "gameplay" ? (
         <TilemapPainter c={c} fs={fs} data={tilemapData} onChange={onTilemapChange} />
       ) : (
-        <>
-          <GridBackdrop c={c} style={{ flex: 1, margin: 14, borderRadius: 14, overflow: "hidden" }}>
-            <div
-              style={{
-                position: "absolute",
-                inset: 0,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexDirection: "column",
-                color: c.textFaint,
-                fontFamily: FONT_DISPLAY,
-                fontSize: fs - 3,
-                letterSpacing: "0.05em",
-                textAlign: "center",
-                padding: 20,
-              }}
-            >
-              <LayoutTemplate size={26} strokeWidth={1.5} />
-              <div style={{ marginTop: 10 }}>MENU CANVAS</div>
-              <div
-                style={{
-                  fontFamily: FONT_BODY,
-                  fontSize: fs - 3,
-                  color: c.textFaint,
-                  marginTop: 4,
-                  maxWidth: 200,
-                  textTransform: "none",
-                  letterSpacing: 0,
-                }}
-              >
-                Working canvas placeholder — build tools attach here
-              </div>
-            </div>
-          </GridBackdrop>
-
-          <div
-            style={{
-              display: "flex",
-              gap: 8,
-              padding: "0 14px 18px",
-              overflowX: "auto",
-            }}
-          >
-            {MENU_TOOLS.map((t) => {
-              const Icon = t.icon;
-              return (
-                <div
-                  key={t.label}
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    gap: 6,
-                    background: c.panel,
-                    border: `1px solid ${c.border}`,
-                    borderRadius: 10,
-                    padding: "10px 14px",
-                    minWidth: 68,
-                    flexShrink: 0,
-                  }}
-                >
-                  <Icon size={17} color={c.textMuted} strokeWidth={1.8} />
-                  <span
-                    style={{
-                      fontFamily: FONT_DISPLAY,
-                      fontSize: fs - 6.5,
-                      color: c.textMuted,
-                      letterSpacing: "0.03em",
-                      textTransform: "uppercase",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {t.label}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </>
+        <MenuPainter c={c} fs={fs} data={menuData} onChange={onMenuChange} />
       )}
     </div>
   );
@@ -1213,12 +1136,15 @@ export default function GameEngineApp() {
   const [projects, setProjects] = useState(seedProjects);
   const [openProject, setOpenProject] = useState(null);
   const [tilemaps, setTilemaps] = useState({});
+  const [menus, setMenus] = useState({});
 
   const c = THEMES[themeName];
   const fs = TEXT_SIZES[textSize];
 
   const setTilemapForProject = (projectId, nextData) =>
     setTilemaps((prev) => ({ ...prev, [projectId]: nextData }));
+  const setMenuForProject = (projectId, nextData) =>
+    setMenus((prev) => ({ ...prev, [projectId]: nextData }));
 
   const handleCreate = ({ name, type, canvasSize, gridSnap }) => {
     const proj = {
@@ -1282,6 +1208,8 @@ export default function GameEngineApp() {
         onBack={() => setScreen("projects")}
         tilemapData={tilemaps[openProject.id] || makeDefaultTilemap()}
         onTilemapChange={(next) => setTilemapForProject(openProject.id, next)}
+        menuData={menus[openProject.id] || makeDefaultMenu()}
+        onMenuChange={(next) => setMenuForProject(openProject.id, next)}
       />
     );
   }
