@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   Home as HomeIcon,
   FolderOpen,
@@ -94,6 +94,30 @@ const PROJECT_TYPES = [
 ];
 
 const uid = () => Math.random().toString(36).slice(2, 9);
+
+// ---------------------------------------------------------------------------
+// Persistence — everything the user builds survives a reload via
+// localStorage. Wrapped in try/catch since private-browsing modes and some
+// embedded webviews can throw on access.
+// ---------------------------------------------------------------------------
+const STORAGE_KEY = "tileforge:v1";
+
+function loadPersisted() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function savePersisted(state) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch (_) {
+    // storage unavailable or full — silently skip, nothing to recover here
+  }
+}
 
 const seedProjects = () => [
   { id: uid(), name: "Ashfall Ruins", type: "combined", tiles: 812, updated: "2d ago" },
@@ -1016,7 +1040,7 @@ function Row({ c, fs, label, sub, right, onClick }) {
   );
 }
 
-function SettingsScreen({ c, fs, theme, setTheme, textSize, setTextSize }) {
+function SettingsScreen({ c, fs, theme, setTheme, textSize, setTextSize, onResetAll }) {
   const [cache, setCache] = useState(48.2);
   const [clearing, setClearing] = useState(false);
 
@@ -1113,6 +1137,40 @@ function SettingsScreen({ c, fs, theme, setTheme, textSize, setTextSize }) {
             </button>
           }
         />
+        <Row
+          c={c}
+          fs={fs}
+          label="Reset all app data"
+          sub="Deletes every project, tilemap, and menu"
+          right={
+            <button
+              onClick={() => {
+                if (
+                  window.confirm(
+                    "This deletes all projects, tilemaps, and menus. This can't be undone. Continue?"
+                  )
+                ) {
+                  onResetAll();
+                }
+              }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                background: "transparent",
+                border: `1px solid ${c.danger}`,
+                borderRadius: 8,
+                padding: "7px 11px",
+                color: c.danger,
+                fontFamily: FONT_BODY,
+                fontSize: fs - 3,
+                cursor: "pointer",
+              }}
+            >
+              <Trash2 size={12} /> Reset
+            </button>
+          }
+        />
 
         <div style={{ height: 18 }} />
         <Eyebrow c={c}>About</Eyebrow>
@@ -1131,12 +1189,22 @@ function SettingsScreen({ c, fs, theme, setTheme, textSize, setTextSize }) {
 // ---------------------------------------------------------------------------
 export default function GameEngineApp() {
   const [screen, setScreen] = useState("home");
-  const [themeName, setThemeName] = useState("dark");
-  const [textSize, setTextSize] = useState("Standard");
-  const [projects, setProjects] = useState(seedProjects);
+  const [themeName, setThemeName] = useState(
+    () => loadPersisted()?.themeName || "dark"
+  );
+  const [textSize, setTextSize] = useState(
+    () => loadPersisted()?.textSize || "Standard"
+  );
+  const [projects, setProjects] = useState(
+    () => loadPersisted()?.projects || seedProjects()
+  );
   const [openProject, setOpenProject] = useState(null);
-  const [tilemaps, setTilemaps] = useState({});
-  const [menus, setMenus] = useState({});
+  const [tilemaps, setTilemaps] = useState(() => loadPersisted()?.tilemaps || {});
+  const [menus, setMenus] = useState(() => loadPersisted()?.menus || {});
+
+  useEffect(() => {
+    savePersisted({ themeName, textSize, projects, tilemaps, menus });
+  }, [themeName, textSize, projects, tilemaps, menus]);
 
   const c = THEMES[themeName];
   const fs = TEXT_SIZES[textSize];
@@ -1145,6 +1213,21 @@ export default function GameEngineApp() {
     setTilemaps((prev) => ({ ...prev, [projectId]: nextData }));
   const setMenuForProject = (projectId, nextData) =>
     setMenus((prev) => ({ ...prev, [projectId]: nextData }));
+
+  const resetAllData = () => {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch (_) {
+      // storage unavailable — state reset below still applies for this session
+    }
+    setProjects(seedProjects());
+    setTilemaps({});
+    setMenus({});
+    setThemeName("dark");
+    setTextSize("Standard");
+    setOpenProject(null);
+    setScreen("home");
+  };
 
   const handleCreate = ({ name, type, canvasSize, gridSnap }) => {
     const proj = {
@@ -1197,6 +1280,7 @@ export default function GameEngineApp() {
         setTheme={setThemeName}
         textSize={textSize}
         setTextSize={setTextSize}
+        onResetAll={resetAllData}
       />
     );
   } else if (screen === "editor" && openProject) {
